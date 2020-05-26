@@ -1,0 +1,249 @@
+Dim colGray As Integer
+Dim colBlack As Integer
+Dim colWhite As Integer
+Dim boardSize As Integer
+Dim WS As Worksheet
+Dim gameRunning As Boolean
+Dim whiteTurn As Boolean
+Dim boardArea As Range
+Function checkLine(theCell As Range, rowOffset As Integer, colOffset As Integer) As Integer
+    If theCell.Interior.ColorIndex = colWhite Then Exit Function
+    If theCell.Interior.ColorIndex = colBlack Then Exit Function
+    Dim newCell As Range
+    Dim validLine As Boolean
+    Dim newColor As Integer
+    Dim atLeastOne As Boolean
+    Dim resultString As Integer
+    Set newCell = theCell
+    validLine = False
+    Do
+        If newCell.Row + rowOffset < 1 Or newCell.Row + rowOffset > boardSize Then Exit Do
+        If newCell.Column + colOffset < 1 Or newCell.Column + colOffset > boardSize Then Exit Do
+        Set newCell = newCell.Offset(rowOffset, colOffset)
+        newColor = newCell.Interior.ColorIndex
+        If newColor = colGray Then
+            Exit Do
+        End If
+        If whiteTurn = True Then
+            If newColor = colBlack Then
+                resultString = resultString + 1
+            End If
+            If newColor = colWhite Then
+                If Len(resultString) > 0 Then
+                    validLine = True
+                    Exit Do
+                Else
+                    Exit Do
+                End If
+            End If
+        Else
+            If newColor = colWhite Then
+                resultString = resultString + 1
+            End If
+            If newColor = colBlack Then
+                If Len(resultString) > 0 Then
+                    validLine = True
+                    Exit Do
+                Else
+                    Exit Do
+                End If
+            End If
+        End If
+        DoEvents
+    Loop
+    If validLine = True Then
+        checkLine = resultString
+    Else
+        checkLine = 0
+    End If
+End Function
+Sub updatePossibleMoves()
+    Dim scanRow As Integer
+    Dim scanCol As Integer
+    Dim theCell As Range
+    Dim resultString As String
+    Dim finalString As Integer
+    Dim atLeastOne As Boolean
+    boardArea.Value = vbNullString
+    atLeastOne = False
+    For Each theCell In boardArea
+        finalString = 0
+        For scanRow = -1 To 1
+            For scanCol = -1 To 1
+                If Not (scanRow = 0 And scanCol = 0) Then
+                    finalString = finalString + checkLine(theCell, scanRow, scanCol)
+                End If
+                DoEvents
+            Next scanCol
+        Next scanRow
+        If finalString > 0 Then
+            theCell.Value = finalString
+            atLeastOne = True
+        End If
+        DoEvents
+    Next theCell
+    If atLeastOne = False Then
+        If whiteTurn = True Then
+            MsgBox "No moves for white!", vbInformation, "No Possible Moves"
+            WS.Cells(1, boardSize + 2).Interior.ColorIndex = colBlack
+            whiteTurn = False
+        Else
+            MsgBox "No moves for black!", vbInformation, "No Possible Moves"
+            WS.Cells(1, boardSize + 2).Interior.ColorIndex = colWhite
+            whiteTurn = True
+        End If
+    End If
+End Sub
+Sub updateScore()
+    If boardArea Is Nothing Then Exit Sub
+    Dim theCell As Range
+    Dim whiteCount As Integer
+    Dim blackCount As Integer
+    For Each theCell In boardArea
+        If theCell.Interior.ColorIndex = colWhite Then whiteCount = whiteCount + 1
+        If theCell.Interior.ColorIndex = colBlack Then blackCount = blackCount + 1
+        DoEvents
+    Next theCell
+    WS.Cells(1, boardSize + 3).Value = "White: " & whiteCount
+    WS.Cells(1, boardSize + 4).Value = "Black: " & blackCount
+End Sub
+Sub gameInit()
+    colGray = 48
+    colBlack = 1
+    colWhite = 2
+    boardSize = 6
+    
+    If WS Is Nothing Then Set WS = Worksheets("gameTab")
+    Dim a1 As Range
+    Set a1 = WS.Range("a1")
+    With WS.Range(a1, a1.SpecialCells(xlCellTypeLastCell))
+        .Value = vbNullString
+        .Borders.LineStyle = xlNone
+        .Interior.ColorIndex = xlNone
+    End With
+    
+    Dim boardBR As Range
+    Set boardBR = WS.Range("a1").Offset(boardSize - 1, boardSize - 1)
+    Set boardArea = WS.Range("a1", boardBR)
+            
+    CommandButton1.Left = WS.Cells(1, boardSize + 1).Left + 4
+    CommandButton1.Top = WS.Cells(2, 1).Top + 4
+    CommandButton2.Left = CommandButton1.Left
+    CommandButton2.Top = CommandButton1.Top + CommandButton1.Height + 4
+        
+    boardArea.Borders.LineStyle = xlContinuous
+    boardArea.Borders.Weight = xlMedium
+    boardArea.Borders.ColorIndex = xlAutomatic
+    With boardArea.Borders(xlInsideVertical)
+        .LineStyle = xlDouble
+        .Weight = xlThick
+        .ColorIndex = 15
+    End With
+    With boardArea.Borders(xlInsideHorizontal)
+        .LineStyle = xlDouble
+        .Weight = xlThick
+        .ColorIndex = 15
+    End With
+    boardArea.Borders(xlDiagonalDown).LineStyle = xlNone
+    boardArea.Borders(xlDiagonalUp).LineStyle = xlNone
+    
+    boardArea.Interior.ColorIndex = colGray
+    Dim startBlock As Range
+    Set startBlock = WS.Cells(boardSize / 2, boardSize / 2)
+    startBlock.Interior.ColorIndex = colWhite
+    startBlock.Offset(0, 1).Interior.ColorIndex = colBlack
+    startBlock.Offset(1, 1).Interior.ColorIndex = colWhite
+    startBlock.Offset(1, 0).Interior.ColorIndex = colBlack
+    whiteTurn = True
+    WS.Cells(1, boardSize + 1).Value = "Turn:"
+    WS.Range("a1").Select
+    WS.Cells(1, boardSize + 2).Borders.LineStyle = xlContinuous
+    WS.Cells(1, boardSize + 2).Borders.Weight = xlMedium
+    WS.Cells(1, boardSize + 2).Borders.ColorIndex = 15
+    WS.Cells(1, boardSize + 2).Borders(xlDiagonalDown).LineStyle = xlNone
+    WS.Cells(1, boardSize + 2).Borders(xlDiagonalUp).LineStyle = xlNone
+    updateScore
+    updatePossibleMoves
+    gameRunning = True
+End Sub
+
+Private Sub CommandButton1_Click()
+    gameInit
+End Sub
+
+Private Sub CommandButton2_Click()
+    gameRunning = False
+End Sub
+
+Private Sub Worksheet_SelectionChange(ByVal Target As Range)
+    If gameRunning = False Then Exit Sub
+    If Target.Cells.Count > 1 Then Exit Sub
+    If Target.Row > boardSize Or Target.Column > boardSize Then Exit Sub
+    If Target.Interior.ColorIndex = colWhite Or _
+       Target.Interior.ColorIndex = colBlack Then Exit Sub
+    Dim scanRow As Integer
+    Dim scanCol As Integer
+    Dim newCell As Range
+    Dim newColor As Integer
+    Dim changeCount As Integer
+    Dim changeAddress As String
+    Dim turnOver As Boolean
+    turnOver = False
+    For scanRow = -1 To 1
+        For scanCol = -1 To 1
+            If Not (scanRow = 0 And scanCol = 0) Then
+                Set newCell = Target
+                changeCount = 0
+                changeAddress = vbNullString
+                Do
+                    If newCell.Row + scanRow < 1 Or newCell.Row + scanRow > boardSize Then Exit Do
+                    If newCell.Column + scanCol < 1 Or newCell.Column + scanCol > boardSize Then Exit Do
+                    Set newCell = newCell.Offset(scanRow, scanCol)
+                    newColor = newCell.Interior.ColorIndex
+                    If newColor = colGray Then Exit Do
+                    If whiteTurn = True Then
+                        If newColor = colBlack Then
+                            changeCount = changeCount + 1
+                            changeAddress = changeAddress & newCell.Address & ","
+                        Else
+                            If changeCount = 0 Then
+                                Exit Do
+                            Else
+                                Target.Interior.ColorIndex = colWhite
+                                WS.Range(Left(changeAddress, Len(changeAddress) - 1)).Interior.ColorIndex = colWhite
+                                turnOver = True
+                                Exit Do
+                            End If
+                        End If
+                    Else
+                        If newColor = colWhite Then
+                            changeCount = changeCount + 1
+                            changeAddress = changeAddress & newCell.Address & ","
+                        Else
+                            If changeCount = 0 Then
+                                Exit Do
+                            Else
+                                Target.Interior.ColorIndex = colBlack
+                                WS.Range(Left(changeAddress, Len(changeAddress) - 1)).Interior.ColorIndex = colBlack
+                                turnOver = True
+                                Exit Do
+                            End If
+                        End If
+                    End If
+                    DoEvents
+                Loop
+            End If
+        Next scanCol
+    Next scanRow
+    If turnOver = True Then
+        If whiteTurn = True Then
+            WS.Cells(1, boardSize + 2).Interior.ColorIndex = colBlack
+            whiteTurn = False
+        Else
+            WS.Cells(1, boardSize + 2).Interior.ColorIndex = colWhite
+            whiteTurn = True
+        End If
+        updateScore
+        updatePossibleMoves
+    End If
+End Sub
